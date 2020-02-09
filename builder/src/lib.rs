@@ -2,9 +2,33 @@ extern crate proc_macro;
 extern crate syn;
 
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, Data};
+use syn::{parse_macro_input, DeriveInput, Data, GenericArgument};
 use quote::quote;
 use syn::export::{Span, TokenStream2};
+
+fn is_option_type_path(tp: &syn::TypePath) -> bool {
+    tp.path.segments.len() > 0 && tp.path.segments[0].ident == "Option" // @todo check for std::option::Option here
+}
+
+fn unwrap_option_ty(ty: &syn::Type) -> &syn::Type {
+    match ty {
+        syn::Type::Path(tp) => {
+            if is_option_type_path(tp) {
+                match &tp.path.segments[0].arguments {
+                    syn::PathArguments::AngleBracketed(pa) =>
+                        match &pa.args[0] {
+                            GenericArgument::Type(t) => t,
+                            _ => panic!("malformed `Option<T>` encountered")
+                        },
+                    _ => unreachable!()
+                }
+            } else {
+                ty
+            }
+        }
+        _ => ty,
+    }
+}
 
 #[proc_macro_derive(Builder)]
 pub fn derive(input: TokenStream) -> TokenStream {
@@ -20,17 +44,37 @@ pub fn derive(input: TokenStream) -> TokenStream {
             for field in element.fields.iter() {
                 let name = &field.ident;
                 let ty = &field.ty;
-                _fields.push(quote! {
-                    #name: std::option::Option<#ty>
-                });
+                let mut is_option_tp: bool = false;
+                let resolved_ty = unwrap_option_ty(ty);
+                match ty {
+                    syn::Type::Path(tp) => {
+                        is_option_tp = is_option_type_path(tp);
+                        _fields.push(if is_option_tp {
+                            quote! {
+                                #name: #ty
+                            }
+                        } else {
+                            quote! {
+                                #name: std::option::Option<#ty>
+                            }
+                        });
+                    }
+                    _ => unreachable!()
+                }
                 _methods.push(quote! {
-                    pub fn #name (&mut self, x: #ty) -> &mut Self {
+                    pub fn #name (&mut self, x: #resolved_ty) -> &mut Self {
                         self.#name = Some(x);
                         self
                     }
                 });
-                _extracts.push(quote! {
-                    #name: self.#name.clone().ok_or("Empty not allowed").unwrap()
+                _extracts.push(if is_option_tp {
+                    quote! {
+                        #name: self.#name.clone()
+                    }
+                } else {
+                    quote! {
+                        #name: self.#name.clone().ok_or(concat!(stringify!(#name), " is required.")).unwrap()
+                    }
                 });
                 _defaults.push(quote! {
                     #name: None
