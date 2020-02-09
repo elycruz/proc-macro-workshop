@@ -2,7 +2,7 @@ extern crate proc_macro;
 extern crate syn;
 
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, DataStruct, DataEnum, Data, Fields, Field};
+use syn::{parse_macro_input, DeriveInput, Data};
 use quote::quote;
 use syn::export::{Span, TokenStream2};
 
@@ -13,34 +13,30 @@ pub fn derive(input: TokenStream) -> TokenStream {
         Data::Enum(_) => panic!("`Builder` can only be derived for `structs`."),
         Data::Union(_) => panic!("`Builder` can only be derived for `structs`."),
         Data::Struct(element) => {
-            let (fields, methods) = element.fields.iter().map(|f| {
-                let name = &f.ident;
-                let ty = &f.ty;
-                (quote! {
+            let mut _fields: Vec<TokenStream2> = vec![];
+            let mut _methods: Vec<TokenStream2> = vec![];
+            let mut _extracts: Vec<TokenStream2> = vec![];
+            let mut _defaults: Vec<TokenStream2> = vec![];
+            for field in element.fields.iter() {
+                let name = &field.ident;
+                let ty = &field.ty;
+                _fields.push(quote! {
                     #name: std::option::Option<#ty>
-                },
-                 quote! {
+                });
+                _methods.push(quote! {
                     pub fn #name (&mut self, x: #ty) -> &mut Self {
                         self.#name = Some(x);
                         self
                     }
-                })
-            })
-                .unzip() as (Vec<TokenStream2>, Vec<TokenStream2>);
-
-            let (extracts, defaults) = element.fields.iter().map(|f| {
-                let name = &f.ident;
-                let ty = &f.ty;
-                (quote! {
+                });
+                _extracts.push(quote! {
                     #name: self.#name.clone().ok_or("Empty not allowed").unwrap()
-                },
-                 quote! {
+                });
+                _defaults.push(quote! {
                     #name: None
-                })
-            })
-                .unzip() as (Vec<TokenStream2>, Vec<TokenStream2>);
-
-            (fields, methods, extracts, defaults)
+                });
+            }
+            (_fields, _methods, _extracts, _defaults)
         }
     };
     let _nident = &_ast.ident;
