@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/sorted/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/sorted/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/sorted/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/sorted/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/builder/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/builder/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/builder/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/builder/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/seq/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/seq/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/seq/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/seq/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/debug/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/debug/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/debug/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/debug/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/bitfield/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bitfield/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bitfield/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/bitfield/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/bitfield/impl/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bitfield/impl/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bitfield/impl/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/bitfield/impl/benches" isTestSource="true" />
+      <excludeFolder url="file://$MODULE_DIR$/bitfield/impl/target" />
+      <excludeFolder url="file://$MODULE_DIR$/bitfield/target" />
+      <excludeFolder url="file://$MODULE_DIR$/builder/target" />
+      <excludeFolder url="file://$MODULE_DIR$/debug/target" />
+      <excludeFolder url="file://$MODULE_DIR$/seq/target" />
+      <excludeFolder url="file://$MODULE_DIR$/sorted/target" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
