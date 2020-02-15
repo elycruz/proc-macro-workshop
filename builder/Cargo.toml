@@ -17,4 +17,5 @@ trybuild = "1.0"
 
 [dependencies]
 quote = "1.0.2"
-syn = {version="1.0.14", features=["extra-traits"]}
+syn = {version="1.0.14", features=["full"]}
+proc-macro2 = "1.0.8"
