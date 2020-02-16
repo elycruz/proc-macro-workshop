@@ -45,7 +45,7 @@ fn unwrap_ty_on_tp(pred: impl Fn(&syn::TypePath) -> bool, ty: &syn::Type) -> std
     }
 }
 
-fn parse_attrs(f: &syn::Field, method_quotes: &mut Vec<TokenStream>) -> std::result::Result<std::option::Option<Ident>, syn::Error> {
+fn parse_attrs(f: &syn::Field, method_quotes: &mut std::vec::Vec<TokenStream>) -> std::result::Result<std::option::Option<Ident>, syn::Error> {
     let attrs = &f.attrs;
     let name = match &f.ident {
         std::option::Option::Some(i) => i.clone(),
@@ -146,9 +146,9 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         syn::Data::Enum(_) => panic!("`Builder` can only be derived for `structs`."),
         syn::Data::Union(_) => panic!("`Builder` can only be derived for `structs`."),
         syn::Data::Struct(element) => {
-            let mut _fields: Vec<TokenStream> = vec![];
-            let mut _methods: Vec<TokenStream> = vec![];
-            let mut _extracts: Vec<TokenStream> = vec![];
+            let mut _fields: std::vec::Vec<TokenStream> = vec![];
+            let mut _methods: std::vec::Vec<TokenStream> = vec![];
+            let mut _extracts: std::vec::Vec<TokenStream> = vec![];
             for field in element.fields.iter() {
                 let name = match &field.ident {
                     std::option::Option::Some(i) => i,
