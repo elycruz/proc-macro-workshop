@@ -111,12 +111,8 @@ fn parse_attrs(f: &syn::Field, method_quotes: &mut std::vec::Vec<TokenStream>) -
                     std::result::Result::Ok(_type) => _type,
                     _ => return std::result::Result::Err(syn::Error::new_spanned(attr_stream, MALFORMED_ATTR_MSG))
                 };
-                // if field and requested method name are the same, bail
-                if ident.eq(&name) {
-                    continue;
-                }
                 attr_name_ident = std::option::Option::Some(name.clone());
-                method_quotes.push(quote! {
+                method_quotes.push(quote! { // @note This could be extended to allow extending of different collection types
                     pub fn #ident (&mut self, x: #inner_ty) -> &mut Self {
                         match &mut self.#name {
                             std::option::Option::Some(xs) => {
