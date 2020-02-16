@@ -4,9 +4,9 @@ extern crate syn;
 use syn::{parse_macro_input, DeriveInput};
 use quote::quote;
 use proc_macro2::{Span, TokenStream, Ident, TokenTree};
-use syn::spanned::Spanned;
+use syn::export::ToTokens;
 
-const MALFORMED_ATTR_MSG: &str = "Malformed builder attribute; Expected format `each = \"method-name-to-create\"`;";
+const MALFORMED_ATTR_MSG: &str = "expected `builder(each = \"...\")`";
 
 fn is_option_type_path(tp: &syn::TypePath) -> bool {
     tp.path.segments.len() > 0 && (
@@ -22,7 +22,7 @@ fn is_type_path_match(pred: impl Fn(&syn::TypePath) -> bool, ty: &syn::Type) -> 
     }
 }
 
-fn always_true_on_tp(tp: &syn::TypePath) -> bool {
+fn always_true_on_tp(_: &syn::TypePath) -> bool {
     true
 }
 
@@ -63,13 +63,19 @@ fn parse_attrs(f: &syn::Field, method_quotes: &mut Vec<TokenStream>) -> Result<O
             syn::AttrStyle::Inner(_) => continue,
             _ => ()
         }
-
+        let attr_stream =
+            if let Some(proc_macro2::TokenTree::Group(_group)) =
+            attr.clone().into_token_stream().into_iter().nth(1) {
+                _group.stream()
+            } else {
+                attr.clone().into_token_stream()
+            };
         if let Some(ps) = attr.path.segments.first() {
             if ps.ident != "builder" {
                 continue;
             }
             if attr.tokens.is_empty() {
-                return Err(syn::Error::new(ps.ident.span(), "expected `builder(each = \"...\")`"));
+                return Err(syn::Error::new_spanned(attr_stream, MALFORMED_ATTR_MSG));
             }
         }
 
@@ -77,35 +83,33 @@ fn parse_attrs(f: &syn::Field, method_quotes: &mut Vec<TokenStream>) -> Result<O
         if let Some(proc_macro2::TokenTree::Group(g)) = attr.tokens.clone().into_iter().next() {
             let mut ts = g.clone().stream().into_iter();
 
-            let each_ident = match ts.next() {
+            // 'each' token
+            match ts.next() {
                 Some(tt) => if &tt.to_string() != "each" {
-                    return Err(syn::Error::new(tt.span(), "expected `builder(each = \"...\")`"));
-                } else {
-                    tt
+                    return Err(syn::Error::new_spanned(attr_stream, MALFORMED_ATTR_MSG));
                 },
-                _ => return Err(syn::Error::new(Span::call_site(), "expected `builder(each = \"...\")`"))
-            };
+                _ => return Err(syn::Error::new_spanned(attr_stream, MALFORMED_ATTR_MSG))
+            }
 
-            let eq_punct = match ts.next() {
+            // '=' token
+            match ts.next() {
                 Some(tt) =>
                     if &tt.to_string() != "=" {
-                        return Err(syn::Error::new(tt.span(), "expected `builder(each = \"...\")`"));
-                    } else {
-                        tt
+                        return Err(syn::Error::new_spanned(attr_stream, MALFORMED_ATTR_MSG));
                     },
-                _ => return Err(syn::Error::new(Span::call_site(), "expected `builder(each = \"...\")`"))
-            };
+                _ => return Err(syn::Error::new_spanned(attr_stream, MALFORMED_ATTR_MSG))
+            }
 
             // If we 'method_name' literal convert and use it
             if let Some(TokenTree::Literal(fn_name_lit)) = ts.next() {
                 let fn_name = match syn::Lit::new(fn_name_lit) {
                     syn::Lit::Str(ls) => ls.value(),
-                    _ => return Err(syn::Error::new(Span::call_site(), "expected `builder(each = \"...\")`"))
+                    _ => return Err(syn::Error::new_spanned(attr_stream, MALFORMED_ATTR_MSG))
                 };
                 let ident = Ident::new(&fn_name, Span::call_site());
                 let inner_ty = match unwrap_ty_on_tp(always_true_on_tp, ty) {
                     Ok(_type) => _type,
-                    _ => return Err(syn::Error::new(Span::call_site(), "expected `builder(each = \"...\")`"))
+                    _ => return Err(syn::Error::new_spanned(attr_stream, MALFORMED_ATTR_MSG))
                 };
                 // if field and requested method name are the same, bail
                 if ident.eq(&name) {
@@ -126,10 +130,10 @@ fn parse_attrs(f: &syn::Field, method_quotes: &mut Vec<TokenStream>) -> Result<O
                     }
                 });
             } else {
-                return Err(syn::Error::new(Span::call_site(), "expected `builder(each = \"...\")`"));
+                return Err(syn::Error::new_spanned(attr_stream, MALFORMED_ATTR_MSG));
             }
         } else {
-            return Err(syn::Error::new(Span::call_site(), "expected `builder(each = \"...\")`"));
+            return Err(syn::Error::new_spanned(attr_stream, MALFORMED_ATTR_MSG));
         }
     }
     Ok(attr_name_ident)
