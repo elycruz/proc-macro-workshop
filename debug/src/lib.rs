@@ -4,8 +4,6 @@ use proc_macro::TokenStream;
 use quote::*;
 use syn::{self, parse_macro_input, parse_quote, DeriveInput};
 use syn::export::TokenStream2;
-use syn::token::Token;
-use std::any::Any;
 
 fn extract_debug_name_value_pair(_field: &syn::Field) -> Result<Option<syn::MetaNameValue>, syn::Error> {
     for attr in &_field.attrs {
@@ -27,11 +25,10 @@ fn extract_debug_name_value_pair(_field: &syn::Field) -> Result<Option<syn::Meta
     Ok(None)
 }
 
-// Add a bound `T: HeapSize` to every type parameter T.
 fn add_trait_bounds(_add_debug_bound: bool, mut generics: syn::Generics) -> syn::Generics {
     for param in &mut generics.params {
         if let syn::GenericParam::Type(ref mut type_param) = *param {
-            // @todo check for `PhantomData...` here, if found, don't push `Debug` bound, else
+            // @todo check for `PhantomData...` here, if found, don't push `Debug` bound
             type_param.bounds.push(parse_quote!(std::fmt::Debug));
         }
     }
@@ -42,7 +39,14 @@ fn is_ty_not_phantom_data(typ: &syn::TypePath) -> bool {
     for ps in &typ.path.segments {
         if ps.ident.to_string().as_str().eq("PhantomData") {
             if let syn::PathArguments::AngleBracketed(_generic_args) = &ps.arguments {
-                for gen_arg in &_generic_args.args.into_iter() {}
+                for gen_arg in (&_generic_args.args).into_iter() {
+                    match gen_arg {
+                        syn::GenericArgument::Type(syn::Type::Path(_tp3)) => {
+                            eprintln!("{:#?}", _tp3.to_token_stream());
+                        }
+                        _ => continue
+                    }
+                }
             }
         }
     }
@@ -71,8 +75,9 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut _extract_parts: Vec<TokenStream2> = vec![];
     let mut _generic_ty_in_phantom_data: bool = false;
     for _field in _fields_iter.clone() {
-        // if let sy
-        // is_ty_not_phantom_data(&_field.ty);
+        // if let syn::Type::Path(tp) = &_field.ty {
+        //     is_ty_not_phantom_data(tp);
+        // };
         let _field_ident = match &_field.ident {
             Some(_field_ident) => _field_ident,
             _ => continue
