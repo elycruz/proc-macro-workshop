@@ -2,9 +2,12 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::*;
-use syn::{self, parse_macro_input, parse_quote, DeriveInput};
+use syn::{self, parse_macro_input, parse_quote, DeriveInput, Generics};
 use syn::export::TokenStream2;
+use std::any::Any;
 
+// Extracts name-value pair attribute from above field or `None` if none
+// Relevant to: tests/03-custom-format.rs
 fn extract_debug_name_value_pair(_field: &syn::Field) -> Result<Option<syn::MetaNameValue>, syn::Error> {
     for attr in &_field.attrs {
         if !attr.path.is_ident("debug") {
@@ -25,6 +28,7 @@ fn extract_debug_name_value_pair(_field: &syn::Field) -> Result<Option<syn::Meta
     Ok(None)
 }
 
+// Adds trait bounds to input token stream's generics
 fn add_trait_bounds(_add_debug_bound: bool, mut generics: syn::Generics) -> syn::Generics {
     for param in &mut generics.params {
         if let syn::GenericParam::Type(ref mut type_param) = *param {
@@ -35,19 +39,64 @@ fn add_trait_bounds(_add_debug_bound: bool, mut generics: syn::Generics) -> syn:
     generics
 }
 
-fn is_ty_not_phantom_data(typ: &syn::TypePath) -> bool {
+fn is_phantom_data_type(p_seg: &syn::PathSegment) -> bool {
+    // eprintln!("path segment: {:}", ps.to_token_stream());
+    if p_seg.ident.to_string().as_str().eq("PhantomData") {
+        return true;
+    }
+    false
+}
+
+// Relevant to: tests/05-phantom-data.rs
+fn has_phantom_data_type_with_generics(typ: &syn::TypePath, generics: &syn::Generics) -> bool {
     for ps in &typ.path.segments {
-        if ps.ident.to_string().as_str().eq("PhantomData") {
-            if let syn::PathArguments::AngleBracketed(_generic_args) = &ps.arguments {
-                for gen_arg in (&_generic_args.args).into_iter() {
-                    match gen_arg {
-                        syn::GenericArgument::Type(syn::Type::Path(_tp3)) => {
-                            eprintln!("{:#?}", _tp3.to_token_stream());
-                        }
-                        _ => continue
+        if !is_phantom_data_type(ps) {
+            continue;
+        }
+        if let syn::PathArguments::AngleBracketed(g_args) = &ps.arguments {
+            for g_arg in &g_args.args.into_iter() {
+                match g_arg {
+                    syn::GenericArgument::Type(syn::Type::Path(g_arg_ty_path)) => {
+                        eprintln!("type path -> segment -> generics: {:#?}", g_arg_ty_path);
                     }
+                    _ => continue
                 }
             }
+        }
+    }
+    false
+}
+
+fn generics_only_appear_in_phantom_data(generics: &syn::Generics, ty_path: &syn::TypePath) -> bool {
+    for param in &generics.params {
+        if let syn::GenericParam::Type(g_param) = param {
+            if is_phantom_data_type_with_generic(ty_path, g_param) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn field_uses_type_param(field: &syn::Field, type_param: &syn::TypeParam) -> bool {
+    eprintln!("{:}", type_param.to_token_stream());
+    if let syn::Type::Path(tp) = &field.ty {
+        for ps in &tp.path.segments {
+            eprintln!("path segment argument: {:}", &ps.arguments.to_token_stream());
+        }
+    }
+    false
+}
+
+fn field_uses_generics(field: &syn::Field, generics: &syn::Generics) -> bool {
+    if let syn::Type::Path(type_path) = &field.ty {
+        for ps in &type_path.path.segments {
+            for g_param in &generics.params {
+                if let syn::GenericParam::Type(type_param) = g_param {
+                    eprintln!("Generic param: {:}", type_param.to_token_stream());
+                }
+            }
+            eprintln!("Field's type: {:}", ps.to_token_stream());
         }
     }
     false
@@ -58,8 +107,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let _ast = parse_macro_input!(input as DeriveInput);
     let _struct_ident = &_ast.ident;
     let _element = match &_ast.data {
-        syn::Data::Enum(_) => panic!("`Builder` can only be derived for `structs`."),
-        syn::Data::Union(_) => panic!("`Builder` can only be derived for `structs`."),
+        syn::Data::Enum(_) => panic!("`CustomDebug` can only be derived for `structs`."),
+        syn::Data::Union(_) => panic!("`CustomDebug` can only be derived for `structs`."),
         syn::Data::Struct(_element) => _element
     };
     let _fields_iter = match &_element.fields {
@@ -74,15 +123,20 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut _fmt_parts: Vec<String> = vec![];
     let mut _extract_parts: Vec<TokenStream2> = vec![];
     let mut _generic_ty_in_phantom_data: bool = false;
+    let mut _generic_ty_in_phantom_data_checks: Vec<bool> = vec![];
     for _field in _fields_iter.clone() {
-        // if let syn::Type::Path(tp) = &_field.ty {
-        //     is_ty_not_phantom_data(tp);
-        // };
+        // Check if field has passed in generics in `PhantomData<...>`
+        if let syn::Type::Path(ty_path) = &_field.ty {
+            generics_only_appear_in_phantom_data(&_ast.generics, ty_path);
+        }
+
         let _field_ident = match &_field.ident {
             Some(_field_ident) => _field_ident,
             _ => continue
         };
         let _field_ident_str = format_ident!("{}", _field_ident);
+
+        // Extract name value pair - tests/03-custom-format.rs
         let _extract = match extract_debug_name_value_pair(_field) {
             Ok(Some(_name_value_pair)) => {
                 let lit = _name_value_pair.lit;
