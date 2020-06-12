@@ -2,11 +2,10 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::*;
-use syn::{self, parse_macro_input, parse_quote, DeriveInput, Generics};
+use syn::{self, parse_macro_input, parse_quote, DeriveInput};
 use syn::export::TokenStream2;
-use std::any::Any;
 
-// Extracts name-value pair attribute from above field or `None` if none
+// Extracts name-value pair attribute from "above" field or `None` if none
 // Relevant to: tests/03-custom-format.rs
 fn extract_debug_name_value_pair(_field: &syn::Field) -> Result<Option<syn::MetaNameValue>, syn::Error> {
     for attr in &_field.attrs {
@@ -40,7 +39,6 @@ fn add_trait_bounds(_add_debug_bound: bool, mut generics: syn::Generics) -> syn:
 }
 
 fn is_phantom_data_type(p_seg: &syn::PathSegment) -> bool {
-    // eprintln!("path segment: {:}", ps.to_token_stream());
     if p_seg.ident.to_string().as_str().eq("PhantomData") {
         return true;
     }
@@ -48,58 +46,44 @@ fn is_phantom_data_type(p_seg: &syn::PathSegment) -> bool {
 }
 
 // Relevant to: tests/05-phantom-data.rs
-fn has_phantom_data_type_with_generics(typ: &syn::TypePath, generics: &syn::Generics) -> bool {
-    for ps in &typ.path.segments {
-        if !is_phantom_data_type(ps) {
-            continue;
+fn is_phantom_data_with_type_param(ty_path: &syn::TypePath, ty_param: &syn::TypeParam) -> bool {
+    let mut ty_param_used_count = 0;
+    let mut phantom_count = 0;
+    for ps in &ty_path.path.segments {
+        if is_phantom_data_type(ps) {
+            phantom_count += 1;
         }
-        if let syn::PathArguments::AngleBracketed(g_args) = &ps.arguments {
-            for g_arg in &g_args.args.into_iter() {
-                match g_arg {
-                    syn::GenericArgument::Type(syn::Type::Path(g_arg_ty_path)) => {
-                        eprintln!("type path -> segment -> generics: {:#?}", g_arg_ty_path);
+        match &ps.arguments {
+            syn::PathArguments::AngleBracketed(args) => {
+                for arg in &args.args {
+                    if let syn::GenericArgument::Type(syn::Type::Path(arg_ty_path)) = arg {
+                        for p_seg in &arg_ty_path.path.segments {
+                            if ty_param.ident.eq(&p_seg.ident) {
+                                eprintln!("{:}\n{:}", &ty_param.ident, &p_seg.ident);
+                                ty_param_used_count += 1;
+                            }
+                        }
                     }
-                    _ => continue
                 }
+            }
+            _ => {
+                phantom_count -= 1;
+                continue;
             }
         }
     }
-    false
+    eprintln!("arg count: {:}", &ty_param_used_count);
+    phantom_count > 0 && ty_param_used_count > 0
 }
 
 fn generics_only_appear_in_phantom_data(generics: &syn::Generics, ty_path: &syn::TypePath) -> bool {
+    let mut results: Vec<bool> = vec![];
     for param in &generics.params {
-        if let syn::GenericParam::Type(g_param) = param {
-            if is_phantom_data_type_with_generic(ty_path, g_param) {
-                return true;
-            }
+        if let syn::GenericParam::Type(ty_param) = param {
+            results.push(is_phantom_data_with_type_param(ty_path, ty_param));
         }
     }
-    false
-}
-
-fn field_uses_type_param(field: &syn::Field, type_param: &syn::TypeParam) -> bool {
-    eprintln!("{:}", type_param.to_token_stream());
-    if let syn::Type::Path(tp) = &field.ty {
-        for ps in &tp.path.segments {
-            eprintln!("path segment argument: {:}", &ps.arguments.to_token_stream());
-        }
-    }
-    false
-}
-
-fn field_uses_generics(field: &syn::Field, generics: &syn::Generics) -> bool {
-    if let syn::Type::Path(type_path) = &field.ty {
-        for ps in &type_path.path.segments {
-            for g_param in &generics.params {
-                if let syn::GenericParam::Type(type_param) = g_param {
-                    eprintln!("Generic param: {:}", type_param.to_token_stream());
-                }
-            }
-            eprintln!("Field's type: {:}", ps.to_token_stream());
-        }
-    }
-    false
+    results.into_iter().filter(|b| b == &true).count() == 1
 }
 
 #[proc_macro_derive(CustomDebug, attributes(debug))]
@@ -122,12 +106,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
     };
     let mut _fmt_parts: Vec<String> = vec![];
     let mut _extract_parts: Vec<TokenStream2> = vec![];
-    let mut _generic_ty_in_phantom_data: bool = false;
+    let mut _generics_appear_only_in_phantom_data: bool = false;
     let mut _generic_ty_in_phantom_data_checks: Vec<bool> = vec![];
+    let mut _generic_appearnces_count = 0;
     for _field in _fields_iter.clone() {
         // Check if field has passed in generics in `PhantomData<...>`
         if let syn::Type::Path(ty_path) = &_field.ty {
-            generics_only_appear_in_phantom_data(&_ast.generics, ty_path);
+            if generics_only_appear_in_phantom_data(&_ast.generics, ty_path) {
+                _generic_appearnces_count += 1;
+            }
         }
 
         let _field_ident = match &_field.ident {
@@ -159,7 +146,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         ]
             .join(" "));
 
-    let _generics = add_trait_bounds(_generic_ty_in_phantom_data, _ast.generics);
+    let _generics = add_trait_bounds(_generic_appearnces_count <= 1, _ast.generics);
     let (impl_generics, ty_generics, where_clause) = &_generics.split_for_impl();
     let _expanded = quote! {
         impl #impl_generics std::fmt::Debug for #_struct_ident #ty_generics #where_clause {
