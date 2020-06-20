@@ -29,6 +29,9 @@ fn extract_debug_name_value_pair(_field: &syn::Field) -> Result<Option<syn::Meta
 
 // Adds trait bounds to input token stream's generics
 fn add_trait_bounds(_add_debug_bound: bool, mut generics: syn::Generics) -> syn::Generics {
+    if !_add_debug_bound {
+        return generics;
+    }
     for param in &mut generics.params {
         if let syn::GenericParam::Type(ref mut type_param) = *param {
             // @todo check for `PhantomData...` here, if found, don't push `Debug` bound
@@ -59,7 +62,7 @@ fn is_phantom_data_with_type_param(ty_path: &syn::TypePath, ty_param: &syn::Type
                     if let syn::GenericArgument::Type(syn::Type::Path(arg_ty_path)) = arg {
                         for p_seg in &arg_ty_path.path.segments {
                             if ty_param.ident.eq(&p_seg.ident) {
-                                eprintln!("{:}\n{:}", &ty_param.ident, &p_seg.ident);
+//                                eprintln!("{:}\n{:}", &ty_param.ident, &p_seg.ident);
                                 ty_param_used_count += 1;
                             }
                         }
@@ -72,7 +75,7 @@ fn is_phantom_data_with_type_param(ty_path: &syn::TypePath, ty_param: &syn::Type
             }
         }
     }
-    eprintln!("arg count: {:}", &ty_param_used_count);
+//    eprintln!("arg count: {:}", &ty_param_used_count);
     phantom_count > 0 && ty_param_used_count > 0
 }
 
@@ -108,12 +111,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut _extract_parts: Vec<TokenStream2> = vec![];
     let mut _generics_appear_only_in_phantom_data: bool = false;
     let mut _generic_ty_in_phantom_data_checks: Vec<bool> = vec![];
-    let mut _generic_appearnces_count = 0;
+    let mut _generic_appearances_count = 0;
     for _field in _fields_iter.clone() {
         // Check if field has passed in generics in `PhantomData<...>`
         if let syn::Type::Path(ty_path) = &_field.ty {
             if generics_only_appear_in_phantom_data(&_ast.generics, ty_path) {
-                _generic_appearnces_count += 1;
+                _generic_appearances_count += 1;
             }
         }
 
@@ -146,7 +149,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
         ]
             .join(" "));
 
-    let _generics = add_trait_bounds(_generic_appearnces_count <= 1, _ast.generics);
+    let _generics = add_trait_bounds(
+        _generic_appearances_count < 1 || _generic_appearances_count > 1, _ast.generics);
     let (impl_generics, ty_generics, where_clause) = &_generics.split_for_impl();
     let _expanded = quote! {
         impl #impl_generics std::fmt::Debug for #_struct_ident #ty_generics #where_clause {
